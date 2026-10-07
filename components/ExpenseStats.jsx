@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 import { useExpenses } from "../context/ExpensesContext.jsx";
 import { computeStats, formatRM } from "../lib/stats";
 
@@ -6,7 +7,11 @@ import { computeStats, formatRM } from "../lib/stats";
 // Context), so adding or deleting an expense updates these numbers instantly.
 export default function ExpenseStats() {
   const { expenses } = useExpenses();
-  const stats = computeStats(expenses);
+
+  // OBJECTIVE: Memoization — computeStats loops over every expense. useMemo
+  // only re-runs it when the `expenses` array itself changes (add/edit/delete),
+  // not on every re-render.
+  const stats = useMemo(() => computeStats(expenses), [expenses]);
 
   const tiles = [
     { label: "Total spent", value: formatRM(stats.total), id: "total" },

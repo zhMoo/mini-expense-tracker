@@ -1,11 +1,9 @@
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { authOptions } from "../../lib/auth";
-import { getAllExpenses } from "../../lib/db";
+import { getCachedExpenses } from "../../lib/cache";
 import { ExpensesProvider } from "../../context/ExpensesContext.jsx";
-import ExpenseStats from "../../components/ExpenseStats.jsx";
-import ExpenseForm from "../../components/ExpenseForm.jsx";
-import ExpenseList from "../../components/ExpenseList.jsx";
+import DashboardTabs from "../../components/DashboardTabs.jsx";
 import SignOutButton from "../../components/SignOutButton.jsx";
 
 // OBJECTIVE: Implementing authentication with NextAuth.js
@@ -13,17 +11,23 @@ import SignOutButton from "../../components/SignOutButton.jsx";
 //
 // This Server Component checks the session first. If there's no session,
 // the redirect happens before any data is read.
-export default async function Dashboard() {
+// The menu tabs; ?tab=add or ?tab=history opens that tab directly.
+const TAB_IDS = ["summary", "add", "history"];
+
+export default async function Dashboard({ searchParams }) {
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/signin");
   }
 
-  // Read this user's expenses directly from MySQL, server-side.
+  const { tab } = await searchParams; // Page searchParams are a Promise in Next.js 15+
+
+  // Read this user's expenses server-side — from the Data Cache when possible,
+  // otherwise from MySQL (see lib/cache.js).
   // If the database is down, show a friendly message instead of crashing.
   let expenses;
   try {
-    expenses = await getAllExpenses(session.user.id);
+    expenses = await getCachedExpenses(session.user.id);
   } catch (err) {
     console.error("Dashboard: could not load expenses:", err);
     return (
@@ -57,12 +61,10 @@ export default async function Dashboard() {
             </div>
           </header>
 
-          <ExpenseStats />
-          <ExpenseForm />
-          <ExpenseList />
+          <DashboardTabs initialTab={TAB_IDS.includes(tab) ? tab : "summary"} />
 
           <footer className="mt-6 text-xs leading-relaxed text-slate-500">
-            Adding and deleting call secured Route Handlers under <code>app/api/expenses/</code>, which
+            Adding, editing and deleting call secured Route Handlers under <code>app/api/expenses/</code>, which
             check your session, validate the input (the amount must be a positive number), then read
             and write a real MySQL database.
           </footer>

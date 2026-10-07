@@ -3,22 +3,25 @@ import { useState } from "react";
 import { useExpenses } from "../context/ExpensesContext.jsx";
 import { CATEGORIES } from "../lib/validation";
 
-export default function ExpenseForm() {
+export default function ExpenseForm({ onViewHistory }) {
   const { addExpense } = useExpenses();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [error, setError] = useState("");
+  const [added, setAdded] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    setAdded("");
     try {
       // The amount is sent exactly as typed. The SERVER decides whether it's
       // a valid positive number, so its error message shows up below.
       await addExpense({ description, amount, category });
+      setAdded(description.trim());
       setDescription("");
       setAmount("");
     } catch (err) {
@@ -57,6 +60,16 @@ export default function ExpenseForm() {
         </select>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
+      {added && (
+        <p className="text-sm text-emerald-700" role="status">
+          Added &ldquo;{added}&rdquo;.{" "}
+          {onViewHistory && (
+            <button type="button" onClick={onViewHistory} className="font-medium underline">
+              View history
+            </button>
+          )}
+        </p>
+      )}
       <button type="submit" disabled={submitting} className="btn">
         {submitting ? "Adding…" : "Add expense"}
       </button>

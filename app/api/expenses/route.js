@@ -1,7 +1,8 @@
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { authOptions } from "../../../lib/auth";
-import { getAllExpenses, createExpense } from "../../../lib/db";
+import { createExpense } from "../../../lib/db";
+import { getCachedExpenses, invalidateExpenses } from "../../../lib/cache";
 import {
   validateDescription,
   validateAmount,
@@ -19,7 +20,7 @@ export async function GET() {
   // OBJECTIVE: Data validation and error handling
   // A database failure becomes a clean 500, never a crash or a stack trace.
   try {
-    return NextResponse.json(await getAllExpenses(session.user.id));
+    return NextResponse.json(await getCachedExpenses(session.user.id));
   } catch (err) {
     console.error("GET /api/expenses failed:", err);
     return NextResponse.json({ error: "Could not load expenses" }, { status: 500 });
@@ -54,6 +55,7 @@ export async function POST(request) {
       amount: parseAmount(body.amount),
       category: body.category,
     });
+    invalidateExpenses(session.user.id); // the cached list is now out of date
     return NextResponse.json(expense, { status: 201 });
   } catch (err) {
     console.error("POST /api/expenses failed:", err);

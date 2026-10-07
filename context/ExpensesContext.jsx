@@ -1,10 +1,10 @@
 "use client";
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useMemo } from "react";
 
 // OBJECTIVE: Managing global application state with the Context API
 //
 // ExpenseForm, ExpenseList and ExpenseStats all need the same `expenses`
-// array. When one changes it (add or delete), the other two update too.
+// array. When one changes it (add, edit or delete), the others update too.
 const ExpensesContext = createContext(null);
 
 export function ExpensesProvider({ initialExpenses, children }) {
@@ -26,6 +26,21 @@ export function ExpensesProvider({ initialExpenses, children }) {
     setExpenses((prev) => [newExpense, ...prev]); // newest first
   }, []);
 
+  // Update — PUT /api/expenses/:id
+  const editExpense = useCallback(async (id, { description, amount, category }) => {
+    const res = await fetch(`/api/expenses/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description, amount, category }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || "Could not update expense");
+    }
+    const updated = await res.json();
+    setExpenses((prev) => prev.map((e) => (e.id === id ? updated : e))); // keeps its place in the list
+  }, []);
+
   // Delete — DELETE /api/expenses/:id
   const removeExpense = useCallback(async (id) => {
     const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
@@ -36,8 +51,17 @@ export function ExpensesProvider({ initialExpenses, children }) {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
+  // OBJECTIVE: Memoization — a new `value` object on every render would make
+  // EVERY component using useExpenses() re-render, even when nothing changed.
+  // useMemo keeps the same object until `expenses` changes (the functions above
+  // are already stable thanks to useCallback).
+  const value = useMemo(
+    () => ({ expenses, addExpense, editExpense, removeExpense }),
+    [expenses, addExpense, editExpense, removeExpense],
+  );
+
   return (
-    <ExpensesContext.Provider value={{ expenses, addExpense, removeExpense }}>
+    <ExpensesContext.Provider value={value}>
       {children}
     </ExpensesContext.Provider>
   );
